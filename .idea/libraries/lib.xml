@@ -1,9 +1,6 @@
 <component name="libraryTable">
   <library name="lib">
     <CLASSES>
-      <root url="jar://$USER_HOME$/jade/lib/jade.jar!/" />
-      <root url="jar://$USER_HOME$/jade/lib/jadeExamples.jar!/" />
-      <root url="jar://$USER_HOME$/jade/lib/commons-codec/commons-codec-1.3.jar!/" />
       <root url="jar://D:/Binaries/JADE_HOME/lib/jade.jar!/" />
       <root url="jar://D:/Binaries/JADE_HOME/lib/commons-codec/commons-codec-1.3.jar!/" />
       <root url="jar://D:/Binaries/JADE_HOME/lib/jadeExamples.jar!/" />
