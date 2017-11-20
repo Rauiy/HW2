@@ -24,6 +24,10 @@ public class AuctionItem implements Serializable{
         buyer = null;
     }
 
+    public String getName() {
+        return name;
+    }
+
     public AID getBuyer(){
         return buyer;
     }
