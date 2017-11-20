@@ -181,6 +181,11 @@ public class ArtistManager extends Agent {
             ACLMessage end = new ACLMessage(ACLMessage.INFORM);
             end.setOntology("AUCTION");
             end.setConversationId("END");
+            if(item.getBuyer() == null){
+                end.setContent("Item was unsold");
+            }else{
+                end.setContent("Item was sold to: " + item.getBuyer().getName());
+            }
 
             sendMsg(myAgent, end);
         }
