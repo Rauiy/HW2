@@ -26,14 +26,14 @@ public class ArtistManager extends Agent {
     private int maxCurators = 5;
     private int minCurators = 3;
     private AuctionItem item;
-    private final double modifier = 500; //0.5
-    private final int strategy = 0; // 0 = static, 1 = percentage,
+    private final double modifier = 0.5; //0.5
+    private final int strategy = 1; // 0 = static, 1 = percentage,
     protected void setup(){
         curators = new ArrayList<AID>();
         item = new AuctionItem(10000, 3000, "MonaLisa");
         registerAtDf();
         MessageTemplate mt = MessageTemplate.and(MessageTemplate.MatchPerformative(ACLMessage.REQUEST),MessageTemplate.MatchConversationId("JOIN"));
-        addBehaviour(new WaitForCurators(this, mt, System.currentTimeMillis()+60000, null, null));
+        addBehaviour(new WaitForCurators(this, mt, System.currentTimeMillis()+20000, null, null));
     }
 
 
@@ -64,25 +64,22 @@ public class ArtistManager extends Agent {
                 System.out.println("Timeout: we got " + curators.size() + " participants");
                 return;
             }
-
+            System.out.println("Curator joined");
             AID curator = msg.getSender();
             curators.add(curator);
-
-            if(curators.size() < maxCurators)
-                reset();
         }
 
         @Override
         public int onEnd(){
             if(curators.size() >= minCurators){
-                System.out.println("Not enough curators found");
-                reset();
+                System.out.println("Auction has " + curators.size() + " participants");
+                myAgent.addBehaviour(new InformOfAuctionStart());
             }
             else{
-                System.out.println("Auction has " + curators.size() + " participants");
-                addBehaviour(new AuctionStart());
+                System.out.println("Not enough curators found");
+                reset();
+                myAgent.addBehaviour(this);
             }
-
             return super.onEnd();
         }
 
@@ -94,34 +91,43 @@ public class ArtistManager extends Agent {
         agent.send(msg);
     }
 
-    private class AuctionStart extends OneShotBehaviour{
+    private class InformOfAuctionStart extends OneShotBehaviour{
 
         @Override
         public void action() {
+            System.out.println(getLocalName() + ": Initiating auction");
             ACLMessage inform = new ACLMessage(ACLMessage.INFORM);
             inform.setOntology("AUCTION");
             inform.setConversationId("START");
             sendMsg(myAgent, inform);
 
+            myAgent.addBehaviour(new AuctionStart());
+        }
+    }
+
+    private class AuctionStart extends OneShotBehaviour{
+
+        @Override
+        public void action() {
+            System.out.println(getLocalName() + ": sending CFP");
             ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
             cfp.setOntology("AUCTION");
             cfp.setConversationId("ITEM");
+
             try {
                 cfp.setContentObject(item);
             } catch (IOException e) {
                 e.printStackTrace();
             }
             sendMsg(myAgent,cfp);
-            MessageTemplate currentMT = MessageTemplate.and(MessageTemplate.MatchConversationId("ITEM_REVEAL"),
-                    MessageTemplate.and(MessageTemplate.MatchOntology("ITEM"),
-                                        MessageTemplate.MatchInReplyTo(cfp.getReplyWith())
-                    )
-            );
-            addBehaviour(new ProposeHandler(myAgent, currentMT, System.currentTimeMillis() + 10000,null,null));
+
+            MessageTemplate currentMT = MessageTemplate.MatchInReplyTo(cfp.getReplyWith());
+            addBehaviour(new ProposeHandler(myAgent, currentMT, System.currentTimeMillis() + 5000,null,null));
         }
     }
 
     private class ProposeHandler extends MsgReceiver{
+        boolean res = false;
         public ProposeHandler(Agent a, MessageTemplate mt, long deadline, DataStore s, Object msgKey) {
             super(a, mt, deadline, s, msgKey);
         }
@@ -133,8 +139,11 @@ public class ArtistManager extends Agent {
                 return;
             }
 
+            System.out.println(getLocalName() + ": got message");
+
             switch (propose.getPerformative()){
                 case ACLMessage.PROPOSE:
+                    System.out.println(getLocalName() + ": Got proposal");
                     if(!item.isSold()){
                         ACLMessage res = propose.createReply();
                         res.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
@@ -152,7 +161,15 @@ public class ArtistManager extends Agent {
                         break;
             }
 
-            reset();
+            res = true;
+        }
+
+        @Override
+        public int onEnd(){
+            if(res)
+                reset();
+
+            return super.onEnd();
         }
     }
 
@@ -168,6 +185,8 @@ public class ArtistManager extends Agent {
                 item.decreasePrice(modifier);
                 break;
         }
+
+        System.out.println(getLocalName() + ": Price to high, lowering it. New Price: " + item.getCurrentPrice());
 
         if(item.getCurrentPrice() >= item.getLimit())
             addBehaviour(new AuctionStart());

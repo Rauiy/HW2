@@ -1,8 +1,6 @@
 import jade.core.AID;
 import jade.core.Agent;
-import jade.core.behaviours.CyclicBehaviour;
-import jade.core.behaviours.DataStore;
-import jade.core.behaviours.SequentialBehaviour;
+import jade.core.behaviours.*;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.NotUnderstoodException;
@@ -14,68 +12,100 @@ import jade.lang.acl.MessageTemplate;
 import jade.lang.acl.UnreadableException;
 import jade.proto.SimpleAchieveREResponder;
 import jade.proto.states.MsgReceiver;
+import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
 
 /**
  * Created by Steven on 2017-11-20.
  */
 public class CuratorAgent extends Agent{
-    private int myBid;
+    private int myBid = 5000;
     private AuctionItem item;
-    private AID artifactManager = null;
+    private AID artistManager = null;
     protected void setup() {
 
-        final MessageTemplate mt = MessageTemplate.and(MessageTemplate.MatchConversationId("Artist-manager"),
-                MessageTemplate.MatchPerformative(ACLMessage.CFP));
+        // Template for receiving auction begin
+        final MessageTemplate informTemplate = MessageTemplate.and(MessageTemplate.MatchConversationId("START"),
+                MessageTemplate.and(MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                                    MessageTemplate.MatchOntology("AUCTION")));
 
-        while (artifactManager == null) {
-            artifactManager = findAgent(this, "Artifact-manager");
+        // Template for matching all auction messages
+        final MessageTemplate auctionTemplate = MessageTemplate.and(MessageTemplate.MatchConversationId("ITEM"),
+                MessageTemplate.MatchOntology("AUCTION"));
+
+        while (artistManager == null) {
+            artistManager = findAgent(this, "AUCTION");
         }
 
-        addBehaviour(new CyclicBehaviour() {
+        SequentialBehaviour sb = new SequentialBehaviour();
+        sb.addSubBehaviour(new joinAuction());
+        sb.addSubBehaviour(new receiveInfo(this, informTemplate, System.currentTimeMillis()+30000, null, null));
+        sb.addSubBehaviour(new receiveProposal(this, auctionTemplate));
 
+        addBehaviour(sb);
+        /*
+        addBehaviour(new CyclicBehaviour() {
             @Override
             public void action() {
-
-
                 SequentialBehaviour sb = new SequentialBehaviour();
-
-                sb.addSubBehaviour(new receiveInfo(myAgent, mt, Long.MAX_VALUE, null, null));
+                sb.addSubBehaviour(new joinAuction());
+                sb.addSubBehaviour(new receiveInfo(myAgent, mt, System.currentTimeMillis()+30000, null, null));
                 sb.addSubBehaviour(new receiveProposal(myAgent, mt));
+
+                myAgent.addBehaviour(sb);
             }
-        });
+        });*/
 
     }
 
-    public class receiveInfo extends MsgReceiver {
+    private class joinAuction extends OneShotBehaviour{
+        @Override
+        public void action() {
+            System.out.println(getLocalName()+": Joining auction");
+            ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+            msg.setConversationId("JOIN");
+            msg.addReceiver(artistManager);
+            myAgent.send(msg);
+        }
+    }
+
+    private class receiveInfo extends MsgReceiver {
         receiveInfo(Agent a, MessageTemplate mt, long dl, DataStore ds, Object msgKey) {
             super(a, mt, dl, ds, msgKey);
         }
+
         @Override
         protected void handleMessage(ACLMessage msg) {
-
-            System.out.println(myAgent.getLocalName() + " is ready for auction!");
-            super.handleMessage(msg);
+            if(msg == null)
+                System.out.println("Never got ready msg");
+            else
+                System.out.println(myAgent.getLocalName() + " is ready for auction!");
         }
     }
 
     public class receiveProposal extends SimpleAchieveREResponder {
+        boolean done = false;
 
-        receiveProposal(Agent a, MessageTemplate mt) {
+        public receiveProposal(Agent a, MessageTemplate mt) {
             super(a, mt);
         }
 
         @Override
-        protected ACLMessage prepareResponse(ACLMessage request) throws NotUnderstoodException, RefuseException {
-
-            try {
-                ACLMessage reply = request.createReply();
-
+        public ACLMessage prepareResponse(ACLMessage request) {
+            ACLMessage response = null;
+            try{
                 switch (request.getPerformative()) {
                     case ACLMessage.CFP:
                         item = (AuctionItem) request.getContentObject();
+                        System.out.println(myAgent.getLocalName() + ": got CFP for " + item.getName());
                         if (item.getCurrentPrice() <= myBid) {
+                            response = request.createReply();
+                            response.setContent("test");
                             System.out.println(myAgent.getLocalName() + " proposes to buy " + item.getName());
-                            reply.setPerformative(ACLMessage.PROPOSE);
+                            response.setPerformative(ACLMessage.PROPOSE);
+                            return response;
+                        }
+                        else{
+                            System.out.println(getLocalName() + ": too expensive");
                         }
                         break;
                     case ACLMessage.ACCEPT_PROPOSAL:
@@ -83,19 +113,28 @@ public class CuratorAgent extends Agent{
                         break;
                     case ACLMessage.REJECT_PROPOSAL:
                         System.out.println(myAgent.getLocalName() + " has lost the " + item.getName());
+                        // Use strategy change bid
                         break;
                     case ACLMessage.INFORM:
-
+                        done = true;
+                        String str = request.getContent();
+                        System.out.println(getLocalName() + " auction ended, reason: " + str);
                         break;
                     default:
-                        reply.setPerformative(ACLMessage.NOT_UNDERSTOOD);
+                        response = request.createReply();
+                        response.setPerformative(ACLMessage.NOT_UNDERSTOOD);
                 }
-                    return reply;
 
             } catch (UnreadableException e) {
                 e.printStackTrace();
             }
-            return super.prepareResponse(request);
+
+            return response;
+        }
+
+        @Override
+        public boolean done() {
+            return false;
         }
     }
 
@@ -113,6 +152,7 @@ public class CuratorAgent extends Agent{
             // Should only exist one agent of each, so take the first one
             if(result.length > 0){
                 tmp = result[0].getName(); // take the first agent with right service available
+                System.out.println("Found auctioneer: " + tmp.getLocalName());
             }
 
         } catch (FIPAException fe) {
