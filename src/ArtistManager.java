@@ -29,8 +29,8 @@ public class ArtistManager extends Agent {
     private int maxCurators = 5;
     private int minCurators = 3;
     private AuctionItem item;
-    private double modifier = 0.9; //500, 0.9, 500
-    private final int strategy = 1; // 0 = static, 1 = decremented decrease, 2 = incremented decrease
+    private double modifier = 750; //500, 0.9, 500
+    private final int strategy = 0; // 0 = flat decrease, 1 = decremented decrease, 2 = incremented decrease
     private Random r = new Random();
     private int rounds = 0;
     protected void setup(){

@@ -22,7 +22,7 @@ public class CuratorAgent extends Agent{
     private int myBid = 3000;
     private AuctionItem item;
     private AID artistManager = null;
-    private int strategy = 0; // 0 = increase with a set value, 1 = increase incrementally, 2 = increase decremental
+    private int strategy = 0; // 0 = increase by flat value, 1 = increase incrementally, 2 = increase decremental
     private double modifier = 500; // 1.2; // 1000
     protected void setup() {
 
@@ -31,6 +31,11 @@ public class CuratorAgent extends Agent{
             strategy = Integer.parseInt((String)args[0]);
         if(args.length > 1)
             modifier = Double.parseDouble((String)args[1]);
+
+        if(strategy == 0)
+            myBid += 500;
+        if(strategy == 2)
+            myBid += 1000;
 
         System.out.println(getLocalName() + ": Starting with strategy: " + strategy + " and modifier: " + modifier);
 
