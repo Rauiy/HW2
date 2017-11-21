@@ -12,10 +12,13 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.proto.SimpleAchieveREInitiator;
 import jade.proto.states.MsgReceiver;
+import sun.plugin2.message.Message;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.Vector;
 
 /**
  * Created by Steven on 2017-11-20.
@@ -26,11 +29,13 @@ public class ArtistManager extends Agent {
     private int maxCurators = 5;
     private int minCurators = 3;
     private AuctionItem item;
-    private final double modifier = 0.5; //0.5
-    private final int strategy = 1; // 0 = static, 1 = percentage,
+    private double modifier = 0.9; //500, 0.9, 500
+    private final int strategy = 1; // 0 = static, 1 = decremented decrease, 2 = incremented decrease
+    private Random r = new Random();
+    private int rounds = 0;
     protected void setup(){
         curators = new ArrayList<AID>();
-        item = new AuctionItem(10000, 3000, "MonaLisa");
+        item = new AuctionItem(r.nextInt(20000) +  5000, r.nextInt(3000)+1000, "MonaLisa");
         registerAtDf();
         MessageTemplate mt = MessageTemplate.and(MessageTemplate.MatchPerformative(ACLMessage.REQUEST),MessageTemplate.MatchConversationId("JOIN"));
         addBehaviour(new WaitForCurators(this, mt, System.currentTimeMillis()+20000, null, null));
@@ -109,29 +114,30 @@ public class ArtistManager extends Agent {
 
         @Override
         public void action() {
+            rounds++;
             System.out.println(getLocalName() + ": sending CFP");
-            ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
-            cfp.setOntology("AUCTION");
-            cfp.setConversationId("ITEM");
+            ACLMessage msg = new ACLMessage(ACLMessage.CFP);
+            msg.setOntology("AUCTION");
+            msg.setConversationId("ITEM");
 
             try {
-                cfp.setContentObject(item);
+                msg.setContentObject(item);
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            sendMsg(myAgent,cfp);
+            sendMsg(myAgent,msg);
 
-            MessageTemplate currentMT = MessageTemplate.MatchInReplyTo(cfp.getReplyWith());
+            MessageTemplate currentMT = MessageTemplate.and(MessageTemplate.MatchConversationId("ITEM"),
+                    MessageTemplate.MatchOntology("AUCTION"));
             addBehaviour(new ProposeHandler(myAgent, currentMT, System.currentTimeMillis() + 5000,null,null));
         }
     }
 
     private class ProposeHandler extends MsgReceiver{
-        boolean res = false;
         public ProposeHandler(Agent a, MessageTemplate mt, long deadline, DataStore s, Object msgKey) {
             super(a, mt, deadline, s, msgKey);
         }
-
+        boolean res = false;
         @Override
         protected void handleMessage(ACLMessage propose){
             if(propose == null) {
@@ -139,7 +145,7 @@ public class ArtistManager extends Agent {
                 return;
             }
 
-            System.out.println(getLocalName() + ": got message");
+            res = true;
 
             switch (propose.getPerformative()){
                 case ACLMessage.PROPOSE:
@@ -160,14 +166,16 @@ public class ArtistManager extends Agent {
                 default:
                         break;
             }
-
-            res = true;
         }
 
         @Override
         public int onEnd(){
-            if(res)
+            if(res && !item.isSold()) {
                 reset();
+                myAgent.addBehaviour(this);
+            }
+            else if(item.isSold())
+                myAgent.addBehaviour(new endAuction());
 
             return super.onEnd();
         }
@@ -176,10 +184,17 @@ public class ArtistManager extends Agent {
     private void lowerThePrice(){
         switch (strategy){
             case 0:
+                // Flat price decrease
                 item.decreasePrice(modifier);
                 break;
             case 1:
+                // Decremented price decrease
                 item.decreasePercentage(modifier);
+                break;
+            case 2:
+                // Incremented price decrease
+                modifier = modifier * 1.1;
+                item.decreasePrice(modifier);
                 break;
             default:
                 item.decreasePrice(modifier);
@@ -199,12 +214,16 @@ public class ArtistManager extends Agent {
         public void action() {
             ACLMessage end = new ACLMessage(ACLMessage.INFORM);
             end.setOntology("AUCTION");
-            end.setConversationId("END");
+            end.setConversationId("ITEM");
+            String str = "Nothing";
             if(item.getBuyer() == null){
-                end.setContent("Item was unsold");
+                str = getLocalName() + ": Item was unsold";
             }else{
-                end.setContent("Item was sold to: " + item.getBuyer().getName());
+                str = getLocalName() + ": Item was sold to: " + item.getBuyer().getLocalName();
             }
+
+            end.setContent(str);
+            System.out.println(str + " in " + rounds + " rounds");
 
             sendMsg(myAgent, end);
         }

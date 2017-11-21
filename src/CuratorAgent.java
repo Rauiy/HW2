@@ -1,5 +1,6 @@
 import jade.core.AID;
 import jade.core.Agent;
+import jade.core.GenericCommand;
 import jade.core.behaviours.*;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
@@ -18,10 +19,20 @@ import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
  * Created by Steven on 2017-11-20.
  */
 public class CuratorAgent extends Agent{
-    private int myBid = 5000;
+    private int myBid = 3000;
     private AuctionItem item;
     private AID artistManager = null;
+    private int strategy = 0; // 0 = increase with a set value, 1 = increase incrementally, 2 = increase decremental
+    private double modifier = 500; // 1.2; // 1000
     protected void setup() {
+
+        Object[] args = getArguments();
+        if(args.length > 0)
+            strategy = Integer.parseInt((String)args[0]);
+        if(args.length > 1)
+            modifier = Double.parseDouble((String)args[1]);
+
+        System.out.println(getLocalName() + ": Starting with strategy: " + strategy + " and modifier: " + modifier);
 
         // Template for receiving auction begin
         final MessageTemplate informTemplate = MessageTemplate.and(MessageTemplate.MatchConversationId("START"),
@@ -96,15 +107,15 @@ public class CuratorAgent extends Agent{
                 switch (request.getPerformative()) {
                     case ACLMessage.CFP:
                         item = (AuctionItem) request.getContentObject();
-                        System.out.println(myAgent.getLocalName() + ": got CFP for " + item.getName());
+                        System.out.println(myAgent.getLocalName() + ": item: " + item.getName() + " price: " + item.getCurrentPrice() + " my bid: " + myBid);
                         if (item.getCurrentPrice() <= myBid) {
                             response = request.createReply();
                             response.setContent("test");
-                            System.out.println(myAgent.getLocalName() + " proposes to buy " + item.getName());
                             response.setPerformative(ACLMessage.PROPOSE);
                         }
                         else{
-                            System.out.println(getLocalName() + ": too expensive");
+                            //System.out.println(getLocalName() + ": too expensive");
+                            increaseBid();
                         }
                         break;
                     case ACLMessage.ACCEPT_PROPOSAL:
@@ -113,11 +124,13 @@ public class CuratorAgent extends Agent{
                     case ACLMessage.REJECT_PROPOSAL:
                         System.out.println(myAgent.getLocalName() + " has lost the " + item.getName());
                         // Use strategy change bid
+                        increaseBid();
                         break;
                     case ACLMessage.INFORM:
                         done = true;
                         String str = request.getContent();
-                        System.out.println(getLocalName() + " auction ended, reason: " + str);
+                        //System.out.println(getLocalName() + " auction ended, reason: " + str);
+                        System.out.println(getLocalName() + ": had the strategy: " + strategy + " and modifier: " + modifier);
                         break;
                     default:
                         response = request.createReply();
@@ -139,6 +152,28 @@ public class CuratorAgent extends Agent{
         @Override
         public boolean done() {
             return false;
+        }
+    }
+
+    private void increaseBid(){
+        switch (strategy){
+            case 0:
+                // Flat bid increase, always same increase
+                myBid += modifier;
+                break;
+            case 1:
+                // Incremented bid increase, begin low end high
+                myBid = (int)(myBid*modifier);
+                break;
+            case 2:
+                // Decremented bid increase, begin high end low
+                modifier = modifier * 0.9;
+                myBid += modifier;
+                break;
+            default:
+                // If nothing is said add a flat modifier
+                modifier += 500;
+                break;
         }
     }
 
