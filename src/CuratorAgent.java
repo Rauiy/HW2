@@ -102,7 +102,6 @@ public class CuratorAgent extends Agent{
                             response.setContent("test");
                             System.out.println(myAgent.getLocalName() + " proposes to buy " + item.getName());
                             response.setPerformative(ACLMessage.PROPOSE);
-                            return response;
                         }
                         else{
                             System.out.println(getLocalName() + ": too expensive");
@@ -130,6 +129,11 @@ public class CuratorAgent extends Agent{
             }
 
             return response;
+        }
+
+        @Override
+        protected ACLMessage prepareResultNotification(ACLMessage request, ACLMessage response){
+            return null;
         }
 
         @Override
