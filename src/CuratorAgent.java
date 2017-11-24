@@ -20,10 +20,20 @@ import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
  */
 public class CuratorAgent extends Agent{
     private int myBid = 3000;
+    private int sBid = myBid;
     private AuctionItem item;
     private AID artistManager = null;
     private int strategy = 0; // 0 = increase by flat value, 1 = increase incrementally, 2 = increase decremental
     private double modifier = 500; // 1.2; // 1000
+    private double sMod = modifier;
+    // Template for receiving auction begin
+    final MessageTemplate informTemplate = MessageTemplate.and(MessageTemplate.MatchConversationId("START"),
+            MessageTemplate.and(MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                    MessageTemplate.MatchOntology("AUCTION")));
+
+    // Template for matching all auction messages
+    final MessageTemplate auctionTemplate = MessageTemplate.and(MessageTemplate.MatchConversationId("ITEM"),
+            MessageTemplate.MatchOntology("AUCTION"));
     protected void setup() {
 
         Object[] args = getArguments();
@@ -37,50 +47,35 @@ public class CuratorAgent extends Agent{
         if(strategy == 2)
             myBid += 1000;
 
+        sBid = myBid;
+        sMod = modifier;
+
         System.out.println(getLocalName() + ": Starting with strategy: " + strategy + " and modifier: " + modifier);
-
-        // Template for receiving auction begin
-        final MessageTemplate informTemplate = MessageTemplate.and(MessageTemplate.MatchConversationId("START"),
-                MessageTemplate.and(MessageTemplate.MatchPerformative(ACLMessage.INFORM),
-                                    MessageTemplate.MatchOntology("AUCTION")));
-
-        // Template for matching all auction messages
-        final MessageTemplate auctionTemplate = MessageTemplate.and(MessageTemplate.MatchConversationId("ITEM"),
-                MessageTemplate.MatchOntology("AUCTION"));
 
         while (artistManager == null) {
             artistManager = findAgent(this, "AUCTION");
         }
+        addBehaviour(new joinAuction());
 
+    }
+
+    private void startAuctionActions(Agent myAgent){
         SequentialBehaviour sb = new SequentialBehaviour();
-        sb.addSubBehaviour(new joinAuction());
         sb.addSubBehaviour(new receiveInfo(this, informTemplate, System.currentTimeMillis()+30000, null, null));
         sb.addSubBehaviour(new receiveProposal(this, auctionTemplate));
 
-        addBehaviour(sb);
-        /*
-        addBehaviour(new CyclicBehaviour() {
-            @Override
-            public void action() {
-                SequentialBehaviour sb = new SequentialBehaviour();
-                sb.addSubBehaviour(new joinAuction());
-                sb.addSubBehaviour(new receiveInfo(myAgent, mt, System.currentTimeMillis()+30000, null, null));
-                sb.addSubBehaviour(new receiveProposal(myAgent, mt));
-
-                myAgent.addBehaviour(sb);
-            }
-        });*/
-
+        myAgent.addBehaviour(sb);
     }
 
     private class joinAuction extends OneShotBehaviour{
         @Override
         public void action() {
             System.out.println(getLocalName()+": Joining auction");
-            ACLMessage msg = new ACLMessage(ACLMessage.REQUEST);
+            ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
             msg.setConversationId("JOIN");
             msg.addReceiver(artistManager);
             myAgent.send(msg);
+            startAuctionActions(myAgent);
         }
     }
 
@@ -93,8 +88,11 @@ public class CuratorAgent extends Agent{
         protected void handleMessage(ACLMessage msg) {
             if(msg == null)
                 System.out.println("Never got ready msg");
-            else
-                System.out.println(myAgent.getLocalName() + " is ready for auction!");
+            else {
+              //  System.out.println(myAgent.getLocalName() + " is ready for auction!");
+                myBid = sBid;
+                modifier = sMod;
+            }
         }
     }
 
@@ -112,7 +110,7 @@ public class CuratorAgent extends Agent{
                 switch (request.getPerformative()) {
                     case ACLMessage.CFP:
                         item = (AuctionItem) request.getContentObject();
-                        System.out.println(myAgent.getLocalName() + ": item: " + item.getName() + " price: " + item.getCurrentPrice() + " my bid: " + myBid);
+                        //System.out.println(myAgent.getLocalName() + ": item: " + item.getName() + " price: " + item.getCurrentPrice() + " my bid: " + myBid);
                         if (item.getCurrentPrice() <= myBid) {
                             response = request.createReply();
                             response.setContent("test");
@@ -135,7 +133,7 @@ public class CuratorAgent extends Agent{
                         done = true;
                         String str = request.getContent();
                         //System.out.println(getLocalName() + " auction ended, reason: " + str);
-                        System.out.println(getLocalName() + ": had the strategy: " + strategy + " and modifier: " + modifier);
+                        //System.out.println(getLocalName() + ": had the strategy: " + strategy + " and modifier: " + modifier);
                         break;
                     default:
                         response = request.createReply();
@@ -156,7 +154,10 @@ public class CuratorAgent extends Agent{
 
         @Override
         public boolean done() {
-            return false;
+            if(done)
+                startAuctionActions(myAgent);
+
+            return done;
         }
     }
 

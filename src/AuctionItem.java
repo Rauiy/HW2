@@ -66,4 +66,13 @@ public class AuctionItem implements Serializable{
     }
 
     public boolean isSold(){return sold;}
+
+    @Override
+    public String toString() {
+        return "AuctionItem{" +
+                "startingPrice=" + startingPrice +
+                ", lowestPrice=" + lowestPrice +
+                ", name='" + name + '\'' +
+                '}';
+    }
 }
