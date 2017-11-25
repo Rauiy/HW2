@@ -62,7 +62,7 @@ public class CuratorAgent extends Agent{
     private void startAuctionActions(Agent myAgent){
         SequentialBehaviour sb = new SequentialBehaviour();
         sb.addSubBehaviour(new receiveInfo(this, informTemplate, System.currentTimeMillis()+30000, null, null));
-        sb.addSubBehaviour(new receiveProposal(this, auctionTemplate));
+        sb.addSubBehaviour(new receiveAuctions(this, auctionTemplate));
 
         myAgent.addBehaviour(sb);
     }
@@ -96,10 +96,10 @@ public class CuratorAgent extends Agent{
         }
     }
 
-    public class receiveProposal extends SimpleAchieveREResponder {
+    public class receiveAuctions extends SimpleAchieveREResponder {
         boolean done = false;
 
-        public receiveProposal(Agent a, MessageTemplate mt) {
+        public receiveAuctions(Agent a, MessageTemplate mt) {
             super(a, mt);
         }
 
