@@ -142,9 +142,6 @@ public class ArtistManager extends Agent {
         private boolean done = false;
         @Override
         public void action() {
-            if(item.getCurrentPrice() < item.getLimit())
-                state = 2;
-
             switch (state){
                 case 0:
                     //System.out.println(getLocalName() + ": Starting auction for: " + item.getName());
