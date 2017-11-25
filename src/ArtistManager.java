@@ -9,7 +9,6 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.proto.SimpleAchieveREInitiator;
 import jade.proto.states.MsgReceiver;
-import sun.plugin2.message.Message;
 
 import java.io.IOException;
 import java.io.Serializable;
