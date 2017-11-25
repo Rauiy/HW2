@@ -166,8 +166,13 @@ public class ArtistManager extends Agent {
                 case 1:
                     ACLMessage proposals = blockingReceive(mt, 5000);
                     if(proposals == null){
-                        lowerThePrice();
-                        state = 0;
+                        // Received all responses
+                        if(item.isSold() || item.getLimit()) {
+                            state = 2;
+                        }else {
+                            lowerThePrice();
+                            state = 0;
+                        }
                         break;
                     }
 
@@ -187,11 +192,12 @@ public class ArtistManager extends Agent {
                             }
                             break;
                         case ACLMessage.NOT_UNDERSTOOD: // implied in default
+                            System.err.print(getLocalName() + "A message wasn't understood");
+                            System.exit(1);
+                            break;
                         default:
                             break;
                     }
-
-                    state = 2;
                     break;
                 case 2:
                     ACLMessage end = new ACLMessage(ACLMessage.INFORM);
@@ -200,8 +206,12 @@ public class ArtistManager extends Agent {
                     String str;
                     if(item.isSold()){
                         str = getLocalName() + ": Item was sold to: " + item.getBuyer().getLocalName();
-                    }else{
-                        str = getLocalName() + ": Item was unsold, due to low bids or not understood";
+                    }
+                    else if(item.getLimit()){
+                        str = getLocalName() + ": Item was unsold, due no proposals for lowest accepted price";
+                    }
+                    else{
+                        str = getLocalName() + ": Error of some kind";
                     }
 
                     end.setContent(str);

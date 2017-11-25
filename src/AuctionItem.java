@@ -12,6 +12,7 @@ public class AuctionItem implements Serializable{
     private final String name;
     private int currentPrice;
     private boolean sold;
+    private boolean limit;
     private AID buyer;
 
     public AuctionItem(int startingPrice, int cost, String name) {
@@ -22,6 +23,7 @@ public class AuctionItem implements Serializable{
         this.currentPrice = startingPrice;
         this.sold = false;
         buyer = null;
+        limit = false;
     }
 
     public String getName() {
@@ -36,8 +38,8 @@ public class AuctionItem implements Serializable{
         return startingPrice;
     }
 
-    public int getLimit() {
-        return lowestPrice;
+    public boolean getLimit() {
+        return limit;
     }
 
     public int getCurrentPrice() {
@@ -53,16 +55,12 @@ public class AuctionItem implements Serializable{
         if(modifier > 0)
             this.currentPrice -= modifier;
 
-        if(this.currentPrice < 0)
-            this.currentPrice = 0;
+        if(this.currentPrice < lowestPrice)
+            limit = true;
     }
 
     public void decreasePercentage(double modifier){
         this.currentPrice = (int)(this.currentPrice*modifier);
-    }
-
-    public void sellItem(){
-        sold = true;
     }
 
     public boolean isSold(){return sold;}
