@@ -28,7 +28,7 @@ public class ArtistManager extends Agent {
     private int minCurators = 3;
     private AuctionItem item;
     private double modifier = 750; //500, 0.9, 500
-    private final int strategy = 0; // 0 = flat decrease, 1 = decremented decrease, 2 = incremented decrease
+    private final int strategy = 0; // 0 = flat decrease, 1 = incremented decrease, 2 = decremented decrease
     private Random r = new Random();
     private int rounds = 0;
     protected void setup(){
@@ -105,14 +105,15 @@ public class ArtistManager extends Agent {
                 item.decreasePrice(modifier);
                 break;
             case 1:
-                // Decremented price decrease
-                item.decreasePercentage(modifier);
-                break;
-            case 2:
                 // Incremented price decrease
                 modifier = modifier * 1.1;
                 item.decreasePrice(modifier);
                 break;
+            case 2:
+                // Decremented price decrease
+                item.decreasePercentage(modifier);
+                break;
+
             default:
                 item.decreasePrice(modifier);
                 break;
