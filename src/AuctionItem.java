@@ -60,7 +60,10 @@ public class AuctionItem implements Serializable{
     }
 
     public void decreasePercentage(double modifier){
+
         this.currentPrice = (int)(this.currentPrice*modifier);
+        if(this.currentPrice < lowestPrice)
+            limit = true;
     }
 
     public boolean isSold(){return sold;}
